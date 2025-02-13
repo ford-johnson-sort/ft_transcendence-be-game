@@ -33,69 +33,81 @@ class PongGameConsumer(AsyncWebsocketConsumer):
         await self.channel_layer.group_add(self.room_group_name, self.channel_name)
         await self.accept()
 
-        # Optionally, inform the other participant that this user has joined.
-        await self.channel_layer.group_send(
-            self.room_group_name,
-            {
-                "type": "game_join",
-                "message": f"{self.username} has joined the game.",
-            },
-        )
+        if self.game_room.user1_online and self.game_room.user2_online:
+          await self.channel_layer.group_send(
+              self.room_group_name,
+              {
+                  "type": "game_start",
+              },
+          )
+        else:
+            await self.send(text_data=json.dumps({
+                "type": "wait",
+                "message": "Please wait for other player to join"
+            }))
 
     @database_sync_to_async
     def get_game_room(self, room_uuid):
         try:
-            return GameRoom.objects.get(id=room_uuid)
+            room = GameRoom.objects.get(id=room_uuid)
+            users = (room.user1, room.user2)
+            self.p1 = self.username == users[0]
+            if self.p1:
+                room.user1_online = True
+            else:
+                room.user2_online = True
+            room.save()
+            return room
         except GameRoom.DoesNotExist:
             return None
+    @database_sync_to_async
+    def delete_game_room(self, room_uuid):
+        try:
+            room = GameRoom.objects.get(id=room_uuid)
+            room.delete()
+        except GameRoom.DoesNotExist:
+            return
 
     async def disconnect(self, close_code):
-        # Inform the group that this user has disconnected.
         await self.channel_layer.group_send(
             self.room_group_name,
             {
-                "type": "game_leave",
-                "message": f"{self.username} has left the game.",
+                "type": "game_end",
+                "winner": not self.p1
             },
         )
 
         # Remove from group.
         await self.channel_layer.group_discard(self.room_group_name, self.channel_name)
+        await self.delete_game_room(self.room_uuid)
 
     async def receive(self, text_data):
-        # When a message is received, broadcast it to the group.
         data = json.loads(text_data)
-        message = data.get("message")
-        if not message:
-            return
 
         await self.channel_layer.group_send(
             self.room_group_name,
             {
-                "type": "game_message",  # calls chat_message method below
-                "message": message,
+                "type": "game_move",
+                "message": data,
                 "username": self.username,
             },
         )
 
-    async def game_message(self, event):
-        # Forward a chat message to the WebSocket.
+    async def game_start(self, event):
         await self.send(text_data=json.dumps({
-            "type": "message",
-            "message": event["message"],
-            "username": event["username"],
+            "type": "start",
+            "p1": self.p1
         }))
 
-    async def game_join(self, event):
-        # Inform that a user has joined.
-        await self.send(text_data=json.dumps({
-            "type": "join",
-            "message": event["message"],
-        }))
+    async def game_move(self, event):
+        if event['username'] == self.username:
+            return
+        await self.send(text_data=json.dumps(
+            event['message']
+        ))
 
-    async def game_leave(self, event):
-        # Inform that a user has left.
+    async def game_end(self, event):
         await self.send(text_data=json.dumps({
-            "type": "leave",
-            "message": event["message"],
+            "type": "end",
+            "winner": self.p1 == event['winner']
         }))

@@ -1,4 +1,4 @@
-# chat/views.py
+# game/views.py
 import jwt
 from django.conf import settings
 from django.http import JsonResponse
@@ -24,12 +24,14 @@ def new_game(request):
     user2 = request.POST.get("user2")
     if not user1 or not user2:
         return JsonResponse({"result": False, "error": "Missing user parameters"})
+    if user1 == user2:
+        return JsonResponse({"result": False, "error": "Duplicate user parameters"})
 
-    # Ensure that the authenticated user is one of the chat participants.
+    # Ensure that the authenticated user is one of the game participants.
     if current_username not in (user1, user2):
         return JsonResponse({
             "result": False,
-            "error": "Authenticated user must be one of the chat participants"
+            "error": "Authenticated user must be one of the game participants"
         })
 
     # Sort the usernames for consistent ordering, then get or create the GameRoom.
