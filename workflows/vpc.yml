@@ -1,0 +1,22 @@
+name: Deploy to VPC
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Trigger Deployment on VPC
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPC_HOST }}
+          username: ${{ secrets.VPC_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 22
+          script: |
+            # Alternatively, if you created the deploy.sh script, simply run it:
+            /home/nicknamemohaji/42seoul/inner-6/ft_transcendence/workflow.sh

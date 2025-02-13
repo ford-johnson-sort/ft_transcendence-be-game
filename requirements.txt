@@ -1,2 +1,4 @@
-Django
-channels[daphne]
+Django==5.1.5
+channels[daphne]==4.2.0
+PyJWT==2.10.1
+psycopg[binary]==3.2.4
