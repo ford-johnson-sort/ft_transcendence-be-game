@@ -7,15 +7,16 @@ from django.db import models
 
 class GameRoom(models.Model):
     """match user table"""
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    user1 = models.CharField(max_length=150)
-    user2 = models.CharField(max_length=150)
+    uuid = models.UUIDField(primary_key=False, default=uuid.uuid4, editable=False)
+    user1 = models.CharField(max_length=150, default=None, null=True)
+    user2 = models.CharField(max_length=150, default=None, null=True)
 
     class GameStatus(models.TextChoices):
         """enum for saving game status"""
         # pylint: disable=R0901
-        CREATED = "CR", _("Game created")
         WAITING = "WA", _("Waiting for other player")
+        CREATED = "CR", _("Game created")
+        JOINED = "JO", _("A Player joined")
         RUNNING = "RU", _("Game Running")
         P1_WIN = "P1", _("P1 Won")
         P2_WIN = "P2", _("P2 Won")
@@ -23,8 +24,8 @@ class GameRoom(models.Model):
     game_status = models.CharField(
         max_length=2,
         choices=GameStatus,
-        default=GameStatus.CREATED,
+        default=GameStatus.WAITING,
     )
 
     def __str__(self):
-        return f"GameRoom({self.id}): {self.user1} vs {self.user2}: {self.game_status}"
+        return f"GameRoom({self.uuid}): {self.user1} vs {self.user2}: {self.game_status}"
