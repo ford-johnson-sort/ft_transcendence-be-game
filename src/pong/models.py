@@ -16,7 +16,6 @@ class GameRoom(models.Model):
         # pylint: disable=R0901
         WAITING = "WA", _("Waiting for other player")
         CREATED = "CR", _("Game created")
-        JOINED = "JO", _("A Player joined")
         RUNNING = "RU", _("Game Running")
         P1_WIN = "P1", _("P1 Won")
         P2_WIN = "P2", _("P2 Won")

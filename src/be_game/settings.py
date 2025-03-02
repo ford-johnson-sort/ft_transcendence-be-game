@@ -30,6 +30,7 @@ ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost').split(',')
 
 INSTALLED_APPS = [
     'daphne',
+    'channels',
     'pong',
 ]
 
@@ -43,9 +44,13 @@ TEMPLATES = [
 
 # Channels
 ASGI_APPLICATION = "be_game.asgi.application"
+REDIS_HOST = os.environ.get('REDIS_HOST', 'localhost')
 CHANNEL_LAYERS = {
     "default": {
-        "BACKEND": "channels.layers.InMemoryChannelLayer"
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [(REDIS_HOST, 6379)],
+        },
     }
 }
 

@@ -1,4 +1,5 @@
 Django==5.1.5
 channels[daphne]==4.2.0
+channels-redis==4.2.1
 PyJWT==2.10.1
 psycopg[binary]==3.2.4

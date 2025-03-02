@@ -51,6 +51,7 @@ def new_game(request):
             game_room.user1=current_username
         else:
             game_room.user2=current_username
+        game_room.game_status = GameRoom.GameStatus.CREATED
     game_room.save()
 
     return JsonResponse({

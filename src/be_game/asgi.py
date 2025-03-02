@@ -6,13 +6,18 @@ from django.core.asgi import get_asgi_application
 # pylint: disable=C0413
 django_asgi_app = get_asgi_application()
 
-from channels.routing import ProtocolTypeRouter, URLRouter
+from channels.routing import ProtocolTypeRouter, URLRouter, ChannelNameRouter
 from channels.security.websocket import AllowedHostsOriginValidator
-from pong.routing import websocket_urlpatterns
+
+from pong.routing import websocket_urlpatterns as PongUrlPattern
+from pong import consumers as PongConsumers
 
 application = ProtocolTypeRouter({
     "http": django_asgi_app,
     "websocket": AllowedHostsOriginValidator(
-        URLRouter(websocket_urlpatterns)
+        URLRouter(PongUrlPattern)
     ),
+    "channel": ChannelNameRouter({
+        'pong-serverlogic': PongConsumers.PongServerLogicConsumer.as_asgi()
+    })
 })
