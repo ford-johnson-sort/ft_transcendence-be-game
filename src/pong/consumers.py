@@ -104,7 +104,7 @@ class PongGameConsumer(AsyncWebsocketConsumer):
                     "reason": "ABANDON"
                 },
             )
-            await self.save_game_result(GameStatus.P2_WIN if self.p1 else GameStatus.P2_WIN)
+            await self.save_game_result(winner)
 
         # Remove from group.
         await self.channel_layer.group_discard(self.room_uuid, self.channel_name)
@@ -118,12 +118,19 @@ class PongGameConsumer(AsyncWebsocketConsumer):
             return None
 
     @database_sync_to_async
-    def save_game_result(self, p1_win):
-        if p1_win:
+    def save_game_result(self, winner: str):
+        # save game result to database
+        if winner == self.game_room.user1:
             self.game_room.game_status = GameStatus.P1_WIN
         else:
             self.game_room.game_status = GameStatus.P2_WIN
         self.game_room.save()
+
+        # delete score from cache
+        r = redis.Redis(host=settings.REDIS_HOST)
+        r.delete(f"game:{self.room_uuid}:score:p1")
+        r.delete(f"game:{self.room_uuid}:score:p2")
+        r.close()
 
     @database_sync_to_async
     def pong_wait_db(self) -> GameStatus:
