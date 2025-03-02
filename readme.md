@@ -198,3 +198,40 @@
   }
 }
 ```
+
+
+# 게임 진행: (WS) 서버 -> 클라이언트 메시지
+
+## 메시지 형식
+
+```json
+{
+  "type": <TYPE>,
+  "data": <DATA>
+}
+```
+
+## type `move_paddle`
+
+키보드 이벤트(`move_paddle`)를 서버에
+
+### 자료
+
+- movement (enum): 움직임 종류. 이 플래그를 적용하여 움직임을 표현
+  - `UP_START`: 위로 움직이기 시작
+  - `UP_END`: 위로 움직임을 멈춤
+  - `DOWN_START`: 아래로 움직이기 시작
+  - `DOWN_END`: 아래로 움직임을 멈춤
+- position (float): 패들 좌표. 이 값을 이용해 좌표를 보정
+
+### 예시
+
+```json
+{
+  "type": "move_paddle",
+  "data": {
+    "movement": "UP_START",
+    "position": 0.21
+  }
+}
+```
