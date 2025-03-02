@@ -85,15 +85,17 @@
 ### 자료
 
 - opponent (str): 상대 닉네임
+- username (str): 본인 닉네임
 - delay (int): 시작 전 대기시간
 
 ### 예시
 
 ```json
 {
-  "type": "wait",
+  "type": "ready",
   "data": {
     "opponent": "ggori",
+    "username": "kyungjle",
     "delay": 3
   }
 }
