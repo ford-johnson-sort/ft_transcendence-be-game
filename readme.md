@@ -61,7 +61,7 @@
 }
 ```
 
-## type `wait`
+## type `WAIT`
 
 상대가 게임에 들어 오기 전, 대기 화면을 표시하기 위해 전달. 소켓 연결 직후 이 메시지를 받게 됨
 
@@ -73,33 +73,35 @@
 
 ```json
 {
-  "type": "wait",
+  "type": "WAIT",
   "data": null
 }
 ```
 
-## type `ready`
+## type `READY`
 
 상대가 입장해 게임을 시작하기 위해 전달. delay만큼의 시간을 기다린 이후, 서버는 공 움직임 이벤트(`move_ball`)를 보내 본격적인 게임의 시작을 알림
 
 ### 자료
 
 - opponent (str): 상대 닉네임
+- username (str): 본인 닉네임
 - delay (int): 시작 전 대기시간
 
 ### 예시
 
 ```json
 {
-  "type": "wait",
+  "type": "READY",
   "data": {
     "opponent": "ggori",
+    "username": "kyungjle",
     "delay": 3
   }
 }
 ```
 
-## type `move_paddle`
+## type `MOVE_PADDLE`
 
 서버는 항상 키보드 이벤트(`move_paddle`)를 전달
 
@@ -116,7 +118,7 @@
 
 ```json
 {
-  "type": "move_paddle",
+  "type": "MOVE_PADDLE",
   "data": {
     "movement": "UP_START",
     "position": 0.21
@@ -124,7 +126,7 @@
 }
 ```
 
-## type `move_ball`
+## type `MOVE_BALL`
 
 공의 가속도가 변화하는 이벤트(벽이나 패들에 닿는 경우)가 발생하면 변화를 전달
 
@@ -132,16 +134,16 @@
 
 - velocity (array): 공 가속도
   - float: x축 가속도
-  - float: y축 가속도
+  - float: z축 가속도
 - position (array): 보정을 위한 좌표
   - float: x 좌표
-  - float: y 좌표
+  - float: z 좌표
 
 ### 예시
 
 ```json
 {
-  "type": "move_ball",
+  "type": "MOVE_BALL",
   "data": {
     "velocity": [1.0, 0.0],
     "position": [5.0, 2.1]
@@ -149,7 +151,7 @@
 }
 ```
 
-## type `end_round`
+## type `END_ROUND`
 
 라운드 종료를 알리는 메시지
 
@@ -164,7 +166,7 @@
 
 ```json
 {
-  "type": "end_round",
+  "type": "END_ROUND",
   "data": {
     "win": true,
     "score": [4, 2]
@@ -172,7 +174,7 @@
 }
 ```
 
-## type `end_game`
+## type `END_GAME`
 
 게임 종료를 알리는 메시지
 
@@ -190,7 +192,7 @@
 
 ```json
 {
-  "type": "end_game",
+  "type": "END_GAME",
   "data": {
     "win": true,
     "score": [1, 4],
@@ -211,7 +213,7 @@
 }
 ```
 
-## type `move_paddle`
+## type `MOVE_PADDLE`
 
 키보드 이벤트(`move_paddle`)를 서버에
 
@@ -228,7 +230,7 @@
 
 ```json
 {
-  "type": "move_paddle",
+  "type": "MOVE_PADDLE",
   "data": {
     "movement": "UP_START",
     "position": 0.21
