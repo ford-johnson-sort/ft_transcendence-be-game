@@ -152,11 +152,14 @@ class PongGameConsumer(AsyncWebsocketConsumer):
             r.set(join_key, self.username)
         else:
             r.delete(join_key)
+            # change status to running
+            self.game_room.game_status = GameStatus.RUNNING
+            self.game_room.save()
         r.close()
         return self.game_room.game_status
 
     # TODO remove debug
-    async def debug(self, event):
+    async def pong_debug(self, event):
         await self.send(text_data=event['message'])
 
     async def pong_wait(self):
@@ -176,9 +179,6 @@ class PongGameConsumer(AsyncWebsocketConsumer):
                     "users": (self.game_room.user1, self.game_room.user2)
                 }
             )
-            # change status to running
-            self.game_room.game_status = GameStatus.RUNNING
-            await database_sync_to_async(self.game_room.save)()
         return
 
     async def pong_ready(self, event):
@@ -348,9 +348,11 @@ class PongServerLogicConsumer(AsyncConsumer):
         if self.score[0] >= self.WINS:
             await self.util_send_end_game(self.users[0])
             self.running = False
-        elif self.score[1] >= self.WINS:
+            return
+        if self.score[1] >= self.WINS:
             await self.util_send_end_game(self.users[1])
             self.running = False
+            return
 
     # helper functions
 
@@ -383,6 +385,18 @@ class PongServerLogicConsumer(AsyncConsumer):
                 'score': self.score
             },
         )
+        
+        # DEBUG
+        await self.channel_layer.group_send(
+            self.room_uuid,
+            {
+                'type': 'pong.debug',
+                'message': json.dumps({
+                    'event': 'send_end_round',
+                    'score': self.score
+                })
+            }
+        )
 
     async def util_send_end_game(self, winner: str) -> None:
         await self.channel_layer.group_send(
@@ -409,7 +423,7 @@ class PongServerLogicConsumer(AsyncConsumer):
         """dummy interface for channel message"""
         return
 
-    async def debug(self, _):
+    async def pong_debug(self, _):
         """dummy interface for channel message"""
         # TODO remove debug
         return
