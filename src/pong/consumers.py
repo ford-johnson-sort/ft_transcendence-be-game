@@ -152,8 +152,6 @@ class PongGameConsumer(AsyncWebsocketConsumer):
             r.set(join_key, self.username)
         else:
             r.delete(join_key)
-            self.game_room.game_status = GameStatus.RUNNING
-            self.game_room.save()
         r.close()
         return self.game_room.game_status
 
@@ -178,6 +176,9 @@ class PongGameConsumer(AsyncWebsocketConsumer):
                     "users": (self.game_room.user1, self.game_room.user2)
                 }
             )
+            # change status to running
+            self.game_room.game_status = GameStatus.RUNNING
+            await sync_to_async(self.game_room.save)()
         return
 
     async def pong_ready(self, event):
