@@ -22,6 +22,7 @@ class PongGameConsumer(AsyncWebsocketConsumer):
     room_uuid: str
     username: str
     game_room: GameRoom
+    score: tuple[int]
 
     async def connect(self):
         """
@@ -56,6 +57,7 @@ class PongGameConsumer(AsyncWebsocketConsumer):
         await self.accept()
 
         # Start game
+        self.score = (0, 0)
         await self.pong_wait()
         return
 
@@ -107,7 +109,7 @@ class PongGameConsumer(AsyncWebsocketConsumer):
                     {
                         "type": "pong.end.game",
                         "winner": winner,
-                        "score": await self.get_score(),
+                        "score": self.score,
                         "reason": "ABANDON"
                     },
                 )
@@ -154,11 +156,6 @@ class PongGameConsumer(AsyncWebsocketConsumer):
             self.game_room.save()
         r.close()
         return self.game_room.game_status
-
-    @database_sync_to_async
-    def get_score(self):
-        # TODO get score from redis
-        return (0, 1)
 
     # DEBUG
     async def debug(self, event):
@@ -240,6 +237,7 @@ class PongGameConsumer(AsyncWebsocketConsumer):
                 "score": event['score'],
             }
         }))
+        self.score = event['score']
 
     async def pong_end_game(self, event):
         await self.send(text_data=json.dumps({
@@ -263,12 +261,6 @@ class PongGameConsumer(AsyncWebsocketConsumer):
         join_key = f"game:{self.room_uuid}:join"
         if r.get(join_key) is not None:
             r.delete(join_key)
-        score_key = f"game:{self.room_uuid}:score:p1"
-        if r.get(score_key) is not None:
-            r.delete(score_key)
-        score_key = f"game:{self.room_uuid}:score:p2"
-        if r.get(score_key) is not None:
-            r.delete(score_key)
         r.close()
 
 
