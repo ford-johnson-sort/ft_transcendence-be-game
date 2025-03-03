@@ -22,5 +22,5 @@ jobs:
     - name: Analysing the code with pylint
       run: |
         pylint --load-plugins pylint_django \
-           --django-settings-module be_chat.settings --disable C0114 \
+           --django-settings-module be_game.settings --disable C0114 \
            $(git ls-files '*.py')
