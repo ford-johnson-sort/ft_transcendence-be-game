@@ -108,10 +108,10 @@
 ### 자료
 
 - movement (enum): 움직임 종류. 이 플래그를 적용하여 상대의 움직임을 표현
-  - `UP_START`: 위로 움직이기 시작
-  - `UP_END`: 위로 움직임을 멈춤
-  - `DOWN_START`: 아래로 움직이기 시작
-  - `DOWN_END`: 아래로 움직임을 멈춤
+  - `LEFT_START`: 왼쪽으로 움직이기 시작
+  - `LEFT_END`: 왼쪽으로 움직임을 멈춤
+  - `RIGHT_START`: 오른쪽으로 움직이기 시작
+  - `RIGHT_END`: 오른쪽으로 움직임을 멈춤
 - position (float): 패들 좌표. 이 값을 이용해 좌표를 보정
 
 ### 예시
@@ -120,7 +120,7 @@
 {
   "type": "MOVE_PADDLE",
   "data": {
-    "movement": "UP_START",
+    "movement": "LEFT_START",
     "position": 0.21
   }
 }
@@ -220,10 +220,10 @@
 ### 자료
 
 - movement (enum): 움직임 종류. 이 플래그를 적용하여 움직임을 표현
-  - `UP_START`: 위로 움직이기 시작
-  - `UP_END`: 위로 움직임을 멈춤
-  - `DOWN_START`: 아래로 움직이기 시작
-  - `DOWN_END`: 아래로 움직임을 멈춤
+  - `LEFT_START`: 왼쪽으로 움직이기 시작
+  - `LEFT_END`: 왼쪽으로 움직임을 멈춤
+  - `RIGHT_START`: 오른쪽으로 움직이기 시작
+  - `RIGHT_END`: 오른쪽으로 움직임을 멈춤
 - position (float): 패들 좌표. 이 값을 이용해 좌표를 보정
 
 ### 예시
@@ -232,8 +232,7 @@
 {
   "type": "MOVE_PADDLE",
   "data": {
-    "movement": "UP_START",
-    "position": 0.21
+    "movement": "LEFT_START",
   }
 }
 ```

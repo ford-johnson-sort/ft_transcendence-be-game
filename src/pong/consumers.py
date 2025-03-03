@@ -85,10 +85,9 @@ class PongGameConsumer(AsyncWebsocketConsumer):
         await self.channel_layer.group_send(
             self.room_uuid,
             {
-                "type": "pong.move.paddle",
+                "type": "pong.move.paddle.controller",
                 "username": self.username,
-                "movement": data['data']['movement'],
-                "position": data['data']['position']
+                "movement": data['data']['movement']
             },
         )
         return
@@ -197,6 +196,10 @@ class PongGameConsumer(AsyncWebsocketConsumer):
                 'delay': event['delay']
             }
         }))
+
+    async def pong_move_paddle_controller(self, _):
+        """dummy interface"""
+        return
 
     async def pong_move_paddle(self, event):
         if event['username'] == self.username:
@@ -320,9 +323,9 @@ class PongServerLogicConsumer(AsyncConsumer):
 
         lastframe = datetime.now()
         while True:
-            delta = ((datetime.now() - lastframe).microseconds / 1000.0) / self.FPS
+            delta = ((datetime.now() - lastframe).microseconds /
+                     1000.0) / self.FPS
             collision = self.game.frame(delta)
-
             if self.game.win is not None:
                 break
             if collision:
@@ -412,6 +415,7 @@ class PongServerLogicConsumer(AsyncConsumer):
         return
 
     async def debug(self, _):
+        """dummy interface for channel message"""
         return
 
     async def pong_end_game(self, event):
@@ -419,9 +423,10 @@ class PongServerLogicConsumer(AsyncConsumer):
         self.running = False
         await self.channel_layer.group_discard(self.room_uuid, 'game.pong')
 
-    async def pong_move_paddle(self, event):
+    async def pong_move_paddle_controller(self, event):
         if event['username'] == self.users[0]:
             self.game.player1.move(event['movement'])
+            position = self.game.player1.position
         else:
             movement = dict({
                 'LEFT_START': 'RIGHT_START',
@@ -430,28 +435,18 @@ class PongServerLogicConsumer(AsyncConsumer):
                 'RIGHT_END': 'LEFT_END',
             }).get(event['movement'])
             self.game.player2.move(movement)
+            position = self.game.player2.position
 
         # debug
         await self.channel_layer.group_send(
             self.room_uuid,
             {
-                'type': 'debug',
-                'message': json.dumps(
-                    {
-                        'p1': {
-                            'pos': {
-                                'x': self.game.player1.position.x,
-                                'z': self.game.player1.position.x,
-                            }
-                        },
-                        'p2': {
-                            'pos': {
-                                'x': self.game.player2.position.x,
-                                'z': self.game.player2.position.x,
-                            }
-                        },
-                        'movement': {
-                            'action': event['movement']
-                        },
-                    })
+                'type': 'pong.move.paddle',
+                'movement': event['movement'],
+                'username': event['username'],
+                'position': (position.x, position.z)
             })
+
+    async def pong_move_paddle(self, _):
+        """dummy interface for channel message"""
+        return
