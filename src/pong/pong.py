@@ -93,7 +93,7 @@ class PongBall:
         elif self.position.x <= -self.FIELD_WIDTH_HALVES:
             collision = True
             self.position.x = self.FIELD_WIDTH_HALVES + 1
-            self.position.x *= -1
+            self.velocity.x *= -1
 
         # handle collision (player)
         if self.position.z >= self.FIELD_DEPTH_HALVES:
