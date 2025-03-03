@@ -184,6 +184,7 @@ class PongGameConsumer(AsyncWebsocketConsumer):
         return
 
     async def pong_ready(self, event):
+        self.game_room = sync_to_async(GameRoom.objects.get)(uuid=self.room_uuid)
         if self.game_room.user1 == self.username:
             opponent = self.game_room.user2
         else:
