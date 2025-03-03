@@ -304,7 +304,7 @@ class PongServerLogicConsumer(AsyncConsumer):
     async def game_init(self) -> None:
         game_settings = PongSettings(
             FIELD_WIDTH=120,
-            FIELD_DEPTH=170,
+            FIELD_DEPTH=170 - 10,
             PADDLE_WIDTH=18,
             BALL_SPEEDZ=1.8
         )
@@ -318,8 +318,7 @@ class PongServerLogicConsumer(AsyncConsumer):
 
         lastframe = datetime.now()
         while True:
-            delta = ((datetime.now() - lastframe).microseconds /
-                     1000.0) / self.FPS
+            delta = ((datetime.now() - lastframe).total_seconds() * 1000.0) / self.FPS
             collision = self.game.frame(delta)
             if self.game.isend():
                 break
@@ -332,7 +331,7 @@ class PongServerLogicConsumer(AsyncConsumer):
                 )
 
             lastframe = datetime.now()
-            await asyncio.sleep(min(self.FPS - delta, 0))
+            await asyncio.sleep(min(self.FPS - delta * self.FPS, 0))
 
     async def game_result(self):
         # send END_ROUND message

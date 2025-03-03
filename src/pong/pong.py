@@ -92,14 +92,14 @@ class PongBall:
             self.velocity.x *= -1
         elif self.position.x <= -self.FIELD_WIDTH_HALVES:
             collision = True
-            self.position.x = self.FIELD_WIDTH_HALVES + 1
+            self.position.x = -self.FIELD_WIDTH_HALVES + 1
             self.velocity.x *= -1
 
         # handle collision (player)
-        if self.position.z <= -self.FIELD_DEPTH_HALVES:
+        if self.position.z >= self.FIELD_DEPTH_HALVES:
             collision |= self._check_player_x(p1)
             self.position.z = self.FIELD_DEPTH_HALVES
-        elif self.position.z >= self.FIELD_DEPTH_HALVES:
+        elif self.position.z <= -self.FIELD_DEPTH_HALVES:
             collision |= self._check_player_x(p2)
             self.position.z = -self.FIELD_DEPTH_HALVES
 
@@ -137,9 +137,9 @@ class PongGame:
         self.FIELD_DEPTH = setting.FIELD_DEPTH
         self.PADDLE_WIDTH = setting.PADDLE_WIDTH
         self.player1 = PongPlayer(PongVector(
-            0.0, -self.FIELD_DEPTH / 2), setting)
-        self.player2 = PongPlayer(PongVector(
             0.0, self.FIELD_DEPTH / 2), setting)
+        self.player2 = PongPlayer(PongVector(
+            0.0, -self.FIELD_DEPTH / 2), setting)
         self.ball = PongBall(
             PongVector(
                 0.0,
@@ -159,11 +159,11 @@ class PongGame:
             (1 if self.ball.velocity.z > 0 else -1)
         # check game end
         # p1 lose
-        if self.ball.position.z <= -self.FIELD_DEPTH / 2 and not collision:
+        if self.ball.position.z >= self.FIELD_DEPTH / 2 and not collision:
             self.win = 2
             return True
         # p2 lose
-        if self.ball.position.z >= self.FIELD_DEPTH / 2 and not collision:
+        if self.ball.position.z <= -self.FIELD_DEPTH / 2 and not collision:
             self.win = 1
             return True
 
