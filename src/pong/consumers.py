@@ -155,7 +155,7 @@ class PongGameConsumer(AsyncWebsocketConsumer):
         r.close()
         return self.game_room.game_status
 
-    # DEBUG
+    # TODO remove debug
     async def debug(self, event):
         await self.send(text_data=event['message'])
 
@@ -266,6 +266,7 @@ class PongGameConsumer(AsyncWebsocketConsumer):
 
 
 class PongServerLogicConsumer(AsyncConsumer):
+    # channel information
     room_uuid: str
     running: bool
     users: tuple[str]
@@ -274,12 +275,12 @@ class PongServerLogicConsumer(AsyncConsumer):
     game: PongGame
     score: tuple[int]
 
-    # consts
+    # constants
     DELAY = 3.0
     FPS = 1000.0 / 60.0
     WINS = 5
 
-    """main worker loop"""
+    # main worker loop
 
     async def game_worker_main(self, event):
         self.room_uuid = event['uuid']
@@ -298,7 +299,7 @@ class PongServerLogicConsumer(AsyncConsumer):
             del self.game
             self.game = None
 
-    """simulators"""
+    # simulators
 
     async def game_init(self) -> None:
         game_settings = PongSettings(
@@ -320,7 +321,7 @@ class PongServerLogicConsumer(AsyncConsumer):
             delta = ((datetime.now() - lastframe).microseconds /
                      1000.0) / self.FPS
             collision = self.game.frame(delta)
-            if self.game.win is not None:
+            if self.game.isend():
                 break
             if collision:
                 await self.util_send_ball_move(
@@ -335,7 +336,7 @@ class PongServerLogicConsumer(AsyncConsumer):
 
     async def game_result(self):
         # send END_ROUND message
-        if self.game.win:
+        if self.game.win == 1:
             self.score = (self.score[0] + 1, self.score[1])
             winner = self.users[0]
         else:
@@ -351,7 +352,7 @@ class PongServerLogicConsumer(AsyncConsumer):
             await self.util_send_end_game(self.users[1])
             self.running = False
 
-    """helper functions"""
+    # helper functions
 
     async def util_send_start(self) -> None:
         await self.channel_layer.group_send(
@@ -394,7 +395,7 @@ class PongServerLogicConsumer(AsyncConsumer):
             },
         )
 
-    """channel event hanlers"""
+    # channel event hanlers
 
     async def pong_ready(self, _):
         """dummy interface for channel message"""
@@ -410,6 +411,7 @@ class PongServerLogicConsumer(AsyncConsumer):
 
     async def debug(self, _):
         """dummy interface for channel message"""
+        # TODO remove debug
         return
 
     async def pong_end_game(self, event):
@@ -431,7 +433,6 @@ class PongServerLogicConsumer(AsyncConsumer):
             self.game.player2.move(movement)
             position = self.game.player2.position
 
-        # debug
         await self.channel_layer.group_send(
             self.room_uuid,
             {

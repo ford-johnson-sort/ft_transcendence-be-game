@@ -163,8 +163,11 @@ class PongGame:
             self.win = 2
             return True
         # p2 lose
-        elif self.ball.position.z >= self.FIELD_DEPTH / 2 and not collision:
+        if self.ball.position.z >= self.FIELD_DEPTH / 2 and not collision:
             self.win = 1
             return True
 
         return collision
+    
+    def isend(self) -> bool:
+        return self.win is not None
