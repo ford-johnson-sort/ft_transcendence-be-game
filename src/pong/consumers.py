@@ -182,7 +182,7 @@ class PongGameConsumer(AsyncWebsocketConsumer):
         return
 
     async def pong_ready(self, event):
-        self.game_room = await database_sync_to_async(self.game_room.refresh_from_db)()
+        self.game_room = await sync_to_async(self.game_room.refresh_from_db)()
         if self.game_room.user1 == self.username:
             opponent = self.game_room.user2
         else:
