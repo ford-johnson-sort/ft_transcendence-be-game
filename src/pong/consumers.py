@@ -251,7 +251,7 @@ class PongGameConsumer(AsyncWebsocketConsumer):
             }
         }))
         await self.cleanup()
-        await self.disconnect(None)
+        await self.close()
 
     async def cleanup(self):
         await self.channel_layer.group_discard(self.room_uuid, self.channel_name)

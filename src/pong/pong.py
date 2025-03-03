@@ -88,20 +88,20 @@ class PongBall:
         # handle collision (wall)
         if self.position.x >= self.FIELD_WIDTH_HALVES:
             collision = True
-            self.position.x = self.FIELD_WIDTH_HALVES
+            self.position.x = self.FIELD_WIDTH_HALVES - 1
             self.velocity.x *= -1
         elif self.position.x <= -self.FIELD_WIDTH_HALVES:
             collision = True
-            self.position.x = self.FIELD_WIDTH_HALVES
+            self.position.x = self.FIELD_WIDTH_HALVES + 1
             self.position.x *= -1
 
         # handle collision (player)
         if self.position.z >= self.FIELD_DEPTH_HALVES:
             collision |= self._check_player_x(p1)
-            self.position.z = self.FIELD_DEPTH_HALVES
+            self.position.z = self.FIELD_DEPTH_HALVES - 1
         elif self.position.z <= -self.FIELD_DEPTH_HALVES:
             collision |= self._check_player_x(p2)
-            self.position.z = -self.FIELD_DEPTH_HALVES
+            self.position.z = -self.FIELD_DEPTH_HALVES + 1
 
         return collision
 
