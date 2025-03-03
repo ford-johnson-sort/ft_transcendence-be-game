@@ -35,7 +35,8 @@ def new_game(request):
     if g is not None:
         return JsonResponse({
             'result': False,
-            'error': 'You have pending game'
+            'error': 'You have pending game',
+            'room_uuid': str(g.uuid)
         })
 
     game_room: GameRoom = GameRoom.objects.filter(
