@@ -23,6 +23,7 @@ class PongGameConsumer(AsyncWebsocketConsumer):
     username: str
     game_room: GameRoom
     score: tuple[int]
+    p1: bool
 
     async def connect(self):
         """
@@ -99,7 +100,7 @@ class PongGameConsumer(AsyncWebsocketConsumer):
         # save status, if game was running
         if self.game_room:
             if self.game_room.game_status == GameStatus.RUNNING:
-                if self.username == self.game_room.user1:
+                if self.p1:
                     winner = self.game_room.user2
                 else:
                     winner = self.game_room.user1
@@ -183,7 +184,9 @@ class PongGameConsumer(AsyncWebsocketConsumer):
 
     async def pong_ready(self, event):
         await sync_to_async(self.game_room.refresh_from_db)()
-        if self.game_room.user1 == self.username:
+        self.p1 = self.username == self.game_room.user1
+
+        if self.p1:
             opponent = self.game_room.user2
         else:
             opponent = self.game_room.user1
@@ -231,14 +234,17 @@ class PongGameConsumer(AsyncWebsocketConsumer):
         }))
 
     async def pong_end_round(self, event):
+        if self.p1:
+            self.score = event['score']
+        else:
+            self.score = event['score'][::-1]
         await self.send(text_data=json.dumps({
             "type": "END_ROUND",
             "data": {
                 "win": event['winner'] == self.username,
-                "score": event['score'],
+                "score": self.score,
             }
         }))
-        self.score = event['score']
 
     async def pong_end_game(self, event):
         await self.send(text_data=json.dumps({
@@ -316,9 +322,16 @@ class PongServerLogicConsumer(AsyncConsumer):
         await self.util_send_start()
         await asyncio.sleep(self.DELAY)
 
+        await self.util_send_ball_move(
+            velocity=(self.game.ball.velocity.x,
+                      self.game.ball.velocity.z),
+            position=(self.game.ball.position.x,
+                      self.game.ball.position.z)
+        )
         lastframe = datetime.now()
         while True:
-            delta = ((datetime.now() - lastframe).total_seconds() * 1000.0) / self.FPS
+            delta = ((datetime.now() - lastframe).total_seconds()
+                     * 1000.0) / self.FPS
             collision = self.game.frame(delta)
             if self.game.isend():
                 break
@@ -331,7 +344,7 @@ class PongServerLogicConsumer(AsyncConsumer):
                 )
 
             lastframe = datetime.now()
-            await asyncio.sleep(min(self.FPS - delta * self.FPS, 0))
+            await asyncio.sleep(max(self.FPS - delta * self.FPS, 0) / 1000)
 
     async def game_result(self):
         # send END_ROUND message
@@ -384,7 +397,7 @@ class PongServerLogicConsumer(AsyncConsumer):
                 'score': self.score
             },
         )
-        
+
         # DEBUG
         await self.channel_layer.group_send(
             self.room_uuid,
