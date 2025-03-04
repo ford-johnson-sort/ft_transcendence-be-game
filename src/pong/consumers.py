@@ -11,7 +11,7 @@ from channels.db import database_sync_to_async
 from asgiref.sync import sync_to_async
 
 from .models import GameRoom
-from .pong import PongSettings, PongGame
+from .pong import PongVector, PongSettings, PongGame
 
 
 GameStatus = GameRoom.GameStatus
@@ -361,11 +361,11 @@ class PongServerLogicConsumer(AsyncConsumer):
         )
         self.game = PongGame(game_settings)
         return
-
-    async def game_round(self) -> None:
-        """Simulates pong game and publish event if needed."""
-        # start round
-        await self.util_send_start()
+    
+    async def game_init_delay(self) -> None:
+        """coroutine for delaying ball movement"""
+        velocity = self.game.ball.velocity
+        self.game.ball.velocity = PongVector(0.0, 0.0)
         await asyncio.sleep(self.DELAY)
         await self.util_send_ball_move(
             velocity=(self.game.ball.velocity.x,
@@ -373,6 +373,14 @@ class PongServerLogicConsumer(AsyncConsumer):
             position=(self.game.ball.position.x,
                       self.game.ball.position.z)
         )
+        self.game.ball.velocity = PongVector(velocity.x, velocity.z)
+        return
+
+    async def game_round(self) -> None:
+        """Simulates pong game and publish event if needed."""
+        # start round
+        asyncio.create_task(self.game_init_delay())
+        await self.util_send_start()
         lastframe = datetime.now()
 
         # loop until game ends
@@ -390,6 +398,8 @@ class PongServerLogicConsumer(AsyncConsumer):
                     position=(self.game.ball.position.x,
                               self.game.ball.position.z)
                 )
+            if -1.0 < self.game.ball.velocity.z < 1.0:
+                self.game.ball.velocity.z = 0.0
 
             lastframe = datetime.now()
             await asyncio.sleep(max(self.FPS - delta * self.FPS, 0) / 1000)
@@ -510,3 +520,4 @@ class PongServerLogicConsumer(AsyncConsumer):
                 'username': event['username'],
                 'position': (position.x, position.z)
             })
+
