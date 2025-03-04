@@ -19,11 +19,14 @@ GameStatus = GameRoom.GameStatus
 
 class PongGameConsumer(AsyncWebsocketConsumer):
     """Game Consumer for managing game"""
+    # informations
     room_uuid: str
     username: str
     game_room: GameRoom
     score: tuple[int]
     p1: bool
+
+    # websocket interfaces
 
     async def connect(self):
         """
@@ -34,26 +37,30 @@ class PongGameConsumer(AsyncWebsocketConsumer):
         - self.room_uuid (str): The current room's UUID, used as the channel layer ID.
         - self.username (str): The user's nickname.
         - self.game_room (GameRoom): The game room database instance.
+        - self.game_room (tuple[int]): Temporary score storage. Initialized to (0, 0)
         """
+        # initialize
         self.room_uuid = self.scope["url_route"]["kwargs"].get("room_uuid")
         self.username = self.scope["url_route"]["kwargs"].get("user")
         if not self.room_uuid or not self.username:
+            # error: required paramaeter is not set
             await self.close()
             return
 
-        # Try to fetch the room from the DB.
-        self.game_room: GameRoom = await self.get_game_room(self.room_uuid)
+        # fetch user
+        self.game_room: GameRoom = await self.connect_getroom(self.room_uuid)
         if self.game_room is None:
-            # No such room exists; abort connection.
+            # error: no room, or user has already joined
             await self.close()
             return
 
         # Ensure that the provided username is one of the room's participants.
         if self.username not in (self.game_room.user1, self.game_room.user2):
+            # error: not one of the users
             await self.close()
             return
 
-        # Join the channel layer group.
+        # good to go. accept connection and register in Channels
         await self.channel_layer.group_add(self.room_uuid, self.channel_name)
         await self.accept()
 
@@ -62,11 +69,32 @@ class PongGameConsumer(AsyncWebsocketConsumer):
         await self.pong_wait()
         return
 
-    async def receive(self, text_data=None, bytes_data=None):
+    @database_sync_to_async
+    def connect_getroom(self, room_uuid) -> GameRoom:
+        """
+        Helper function for connect. Fetches GameRoom instance from database.
+        Blocks request if same user has already joined.
+        """
+        try:
+            r = redis.Redis(host=settings.REDIS_HOST)
+            join_key = f"game:{self.room_uuid}:join"
+            if r.get(join_key) == self.username.encode():
+                r.close()
+                return None
+
+            r.close()
+
+            room: GameRoom = GameRoom.objects.get(uuid=room_uuid)
+            return room
+        except GameRoom.DoesNotExist:
+            return None
+
+    async def receive(self, text_data=None, _=None):
         """
         Channels library interface for receiving a message from the user.
 
         This method handles receiving the paddle movement and passes it to the other player.
+        All movements must be processed by server, so pong.move.paddle.controller is called.
         """
         if self.game_room.game_status != GameStatus.RUNNING:
             # error case...
@@ -85,6 +113,7 @@ class PongGameConsumer(AsyncWebsocketConsumer):
         if 'type' not in data or data['type'] != 'MOVE_PADDLE':
             # Not expected message
             return
+        # call controller
         await self.channel_layer.group_send(
             self.room_uuid,
             {
@@ -95,7 +124,7 @@ class PongGameConsumer(AsyncWebsocketConsumer):
         )
         return
 
-    async def disconnect(self, code):
+    async def disconnect(self, _):
         """Channels library interface for handling disconnect."""
         # save status, if game was running
         if self.game_room:
@@ -114,30 +143,15 @@ class PongGameConsumer(AsyncWebsocketConsumer):
                         "reason": "ABANDON"
                     },
                 )
-                await self.save_game_result(winner)
-            await self.cleanup()
+                await self.disconnect_savegame(winner)
 
-        # Remove from group.
-        await self.channel_layer.group_discard(self.room_uuid, self.channel_name)
-
-    @database_sync_to_async
-    def get_game_room(self, room_uuid) -> GameRoom:
-        try:
-            r = redis.Redis(host=settings.REDIS_HOST)
-            join_key = f"game:{self.room_uuid}:join"
-            if r.get(join_key) == self.username.encode():
-                r.close()
-                return None
-
-            r.close()
-
-            room: GameRoom = GameRoom.objects.get(uuid=room_uuid)
-            return room
-        except GameRoom.DoesNotExist:
-            return None
+        # clean dangling informations
+        await self.cleanup()
+        return
 
     @database_sync_to_async
-    def save_game_result(self, winner: str):
+    def disconnect_savegame(self, winner: str) -> None:
+        """Helper function for disconnect. save game reuslt to database"""
         # save game result to database
         if winner == self.game_room.user1:
             self.game_room.game_status = GameStatus.P1_WIN
@@ -145,8 +159,31 @@ class PongGameConsumer(AsyncWebsocketConsumer):
             self.game_room.game_status = GameStatus.P2_WIN
         self.game_room.save()
 
+    # channel event hanlers
+
+    async def pong_wait(self) -> None:
+        """Sends `WAIT` event. Start worker if both player is joined."""
+        # always send wait message
+        await self.send(text_data=json.dumps({
+            "type": "WAIT",
+            "data": None
+        }))
+        # check game status and start if needed
+        if await self.pong_wait_getcache() == GameStatus.RUNNING:
+            # start worker
+            await self.channel_layer.send(
+                "pong-serverlogic",
+                {
+                    "type": "game.worker.main",
+                    "uuid": self.room_uuid,
+                    "users": (self.game_room.user1, self.game_room.user2)
+                }
+            )
+        return
+
     @database_sync_to_async
-    def pong_wait_db(self) -> GameStatus:
+    def pong_wait_getcache(self) -> GameStatus:
+        """Helper function for pong_wait. Set GameStatus if other player has joined."""
         r = redis.Redis(host=settings.REDIS_HOST)
         join_key = f"game:{self.room_uuid}:join"
         if r.get(join_key) is None:
@@ -159,30 +196,8 @@ class PongGameConsumer(AsyncWebsocketConsumer):
         r.close()
         return self.game_room.game_status
 
-    # TODO remove debug
-    async def pong_debug(self, event):
-        await self.send(text_data=event['message'])
-
-    async def pong_wait(self):
-        # always send wait message
-        await self.send(text_data=json.dumps({
-            "type": "WAIT",
-            "data": None
-        }))
-        # check game status and start if needed
-        if await self.pong_wait_db() == GameStatus.RUNNING:
-            # start worker
-            await self.channel_layer.send(
-                "pong-serverlogic",
-                {
-                    "type": "game.worker.main",
-                    "uuid": self.room_uuid,
-                    "users": (self.game_room.user1, self.game_room.user2)
-                }
-            )
-        return
-
     async def pong_ready(self, event):
+        """Handler for `READY` event. Updates game_room for sync and send command."""
         await sync_to_async(self.game_room.refresh_from_db)()
         self.p1 = self.username == self.game_room.user1
 
@@ -198,12 +213,10 @@ class PongGameConsumer(AsyncWebsocketConsumer):
                 'delay': event['delay']
             }
         }))
-
-    async def pong_move_paddle_controller(self, _):
-        """dummy interface"""
         return
 
     async def pong_move_paddle(self, event):
+        """Handler for `MOVE_PADDLE` event. Inverts opponent movement, sends command."""
         if event['username'] == self.username:
             return
         movement = dict({
@@ -223,8 +236,10 @@ class PongGameConsumer(AsyncWebsocketConsumer):
                 'position': event['position']
             }
         }))
+        return
 
     async def pong_move_ball(self, event):
+        """Handler for `MOVE_BALL` event. Sends command."""
         await self.send(text_data=json.dumps({
             'type': 'MOVE_BALL',
             'data': {
@@ -232,8 +247,10 @@ class PongGameConsumer(AsyncWebsocketConsumer):
                 'position': event['position']
             }
         }))
+        return
 
     async def pong_end_round(self, event):
+        """Handler for `END_ROUND` event. Sends command."""
         if self.p1:
             self.score = event['score']
         else:
@@ -245,8 +262,10 @@ class PongGameConsumer(AsyncWebsocketConsumer):
                 "score": self.score,
             }
         }))
+        return
 
     async def pong_end_game(self, event):
+        """Handler for `END_ROUND` event. Sends command, clean connection."""
         await self.send(text_data=json.dumps({
             "type": "END_GAME",
             "data": {
@@ -257,21 +276,35 @@ class PongGameConsumer(AsyncWebsocketConsumer):
         }))
         await self.cleanup()
         await self.close()
+        return
 
-    async def cleanup(self):
-        await self.channel_layer.group_discard(self.room_uuid, self.channel_name)
+    # helper funtions
+
+    async def cleanup(self) -> None:
+        """Remove this consumer from channel layer, remove cache"""
+        if self.room_uuid:
+            await self.channel_layer.group_discard(self.room_uuid, self.channel_name)
         await self.cleanup_cache()
+        return
 
     @database_sync_to_async
-    def cleanup_cache(self):
+    def cleanup_cache(self) -> None:
+        """Helper function for cleanup. Remove data from database"""
         r = redis.Redis(host=settings.REDIS_HOST)
         join_key = f"game:{self.room_uuid}:join"
         if r.get(join_key) is not None:
             r.delete(join_key)
         r.close()
 
+    # controller interface for Channels message
+
+    async def pong_move_paddle_controller(self, _):
+        """dummy interface"""
+        return
+
 
 class PongServerLogicConsumer(AsyncConsumer):
+    """Logic Consumer for server-side pong"""
     # channel information
     room_uuid: str
     running: bool
@@ -289,6 +322,7 @@ class PongServerLogicConsumer(AsyncConsumer):
     # main worker loop
 
     async def game_worker_main(self, event):
+        """Entrypoint for PSLC. Spawns worker with event loop"""
         self.room_uuid = event['uuid']
         self.users = event['users']
         self.running = True
@@ -296,18 +330,22 @@ class PongServerLogicConsumer(AsyncConsumer):
 
         await self.channel_layer.group_add(self.room_uuid, self.channel_name)
         asyncio.create_task(self.game_worker())
+        return
 
     async def game_worker(self):
+        """Main function for worker."""
         while self.running:
             await self.game_init()
             await self.game_round()
             await self.game_result()
             del self.game
             self.game = None
+        return
 
     # simulators
 
     async def game_init(self) -> None:
+        """Creates PongGame with default settings."""
         game_settings = PongSettings(
             FIELD_WIDTH=120,
             FIELD_DEPTH=170 - 10,
@@ -318,10 +356,10 @@ class PongServerLogicConsumer(AsyncConsumer):
         return
 
     async def game_round(self) -> None:
-        # start roun
+        """Simulates pong game and publish event if needed."""
+        # start round
         await self.util_send_start()
         await asyncio.sleep(self.DELAY)
-
         await self.util_send_ball_move(
             velocity=(self.game.ball.velocity.x,
                       self.game.ball.velocity.z),
@@ -329,9 +367,12 @@ class PongServerLogicConsumer(AsyncConsumer):
                       self.game.ball.position.z)
         )
         lastframe = datetime.now()
+
+        # loop until game ends
         while True:
             delta = ((datetime.now() - lastframe).total_seconds()
                      * 1000.0) / self.FPS
+
             collision = self.game.frame(delta)
             if self.game.isend():
                 break
@@ -347,6 +388,7 @@ class PongServerLogicConsumer(AsyncConsumer):
             await asyncio.sleep(max(self.FPS - delta * self.FPS, 0) / 1000)
 
     async def game_result(self):
+        """After round ends, sends END_ROUND message. sends END_GAME if needed."""
         # send END_ROUND message
         if self.game.win == 1:
             self.score = (self.score[0] + 1, self.score[1])
@@ -369,6 +411,7 @@ class PongServerLogicConsumer(AsyncConsumer):
     # helper functions
 
     async def util_send_start(self) -> None:
+        """Calls READY message handles."""
         await self.channel_layer.group_send(
             self.room_uuid,
             {
@@ -378,6 +421,7 @@ class PongServerLogicConsumer(AsyncConsumer):
         )
 
     async def util_send_ball_move(self, velocity: tuple[float], position: tuple[float]) -> None:
+        """Calls MOVE_BALL message handles."""
         await self.channel_layer.group_send(
             self.room_uuid,
             {
@@ -389,6 +433,7 @@ class PongServerLogicConsumer(AsyncConsumer):
         return
 
     async def util_send_end_round(self, winner: str) -> None:
+        """Calls END_ROUND message handles."""
         await self.channel_layer.group_send(
             self.room_uuid,
             {
@@ -398,19 +443,8 @@ class PongServerLogicConsumer(AsyncConsumer):
             },
         )
 
-        # DEBUG
-        await self.channel_layer.group_send(
-            self.room_uuid,
-            {
-                'type': 'pong.debug',
-                'message': json.dumps({
-                    'event': 'send_end_round',
-                    'score': self.score
-                })
-            }
-        )
-
     async def util_send_end_game(self, winner: str) -> None:
+        """Calls END_GAME message handles."""
         await self.channel_layer.group_send(
             self.room_uuid,
             {
@@ -421,9 +455,13 @@ class PongServerLogicConsumer(AsyncConsumer):
             },
         )
 
-    # channel event hanlers
+    # channel event hanle interfaces for Channels message
 
     async def pong_ready(self, _):
+        """dummy interface for channel message"""
+        return
+
+    async def pong_move_paddle(self, _):
         """dummy interface for channel message"""
         return
 
@@ -435,17 +473,15 @@ class PongServerLogicConsumer(AsyncConsumer):
         """dummy interface for channel message"""
         return
 
-    async def pong_debug(self, _):
-        """dummy interface for channel message"""
-        # TODO remove debug
-        return
-
-    async def pong_end_game(self, event):
-        # pylint: disable=W0613
+    async def pong_end_game(self, _):
+        """If client disconnects, end worker"""
         self.running = False
         await self.channel_layer.group_discard(self.room_uuid, 'game.pong')
 
+    # controllers
+
     async def pong_move_paddle_controller(self, event):
+        """Update player information, and calls MOVE_PADDLE handlers."""
         if event['username'] == self.users[0]:
             self.game.player1.move(event['movement'])
             position = self.game.player1.position
@@ -467,7 +503,3 @@ class PongServerLogicConsumer(AsyncConsumer):
                 'username': event['username'],
                 'position': (position.x, position.z)
             })
-
-    async def pong_move_paddle(self, _):
-        """dummy interface for channel message"""
-        return
