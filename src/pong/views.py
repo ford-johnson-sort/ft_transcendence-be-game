@@ -12,10 +12,14 @@ from .models import GameRoom
 
 @require_POST
 def new_game(request):
+    """Matchmaking logic"""
     # check if user has authenticated
     token = request.COOKIES.get("ford-johnson-sort")
     if not token:
-        return JsonResponse({"result": False, "error": "authentication error"})
+        return JsonResponse(
+            {"result": False, "error": "authentication error"},
+            status=401
+        )
     try:
         payload = jwt.decode(token, settings.JWT_SECRET,
                              algorithms=[settings.JWT_ALGORITHM])
@@ -23,7 +27,10 @@ def new_game(request):
         if not current_username:
             raise jwt.PyJWTError
     except jwt.PyJWTError:
-        return JsonResponse({"result": False, "error": "authentication error"})
+        return JsonResponse(
+            {"result": False, "error": "authentication error"},
+            status=401
+        )
 
     # check if user has pending game
     g: GameRoom | None = GameRoom.objects.exclude(
@@ -36,7 +43,8 @@ def new_game(request):
         return JsonResponse({
             'result': False,
             'error': 'You have pending game',
-            'room_uuid': str(g.uuid)
+            'room_uuid': str(g.uuid),
+            'username': current_username
         })
 
     game_room: GameRoom = GameRoom.objects.filter(
@@ -49,9 +57,9 @@ def new_game(request):
             game_room = GameRoom(user2=current_username)
     else:
         if game_room.user1 is None:
-            game_room.user1=current_username
+            game_room.user1 = current_username
         else:
-            game_room.user2=current_username
+            game_room.user2 = current_username
         game_room.game_status = GameRoom.GameStatus.CREATED
     game_room.save()
 
