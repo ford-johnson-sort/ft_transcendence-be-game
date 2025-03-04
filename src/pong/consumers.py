@@ -240,11 +240,18 @@ class PongGameConsumer(AsyncWebsocketConsumer):
 
     async def pong_move_ball(self, event):
         """Handler for `MOVE_BALL` event. Sends command."""
+        if self.p1:
+            position = event['position']
+            velocity = event['velocity']
+        else:
+            position = [n * -1 for n in event['position']]
+            velocity = [n * -1 for n in event['velocity']]
+
         await self.send(text_data=json.dumps({
             'type': 'MOVE_BALL',
             'data': {
-                'velocity': event['velocity'],
-                'position': event['position']
+                'velocity': velocity,
+                'position': position
             }
         }))
         return
