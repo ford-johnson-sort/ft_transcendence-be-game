@@ -347,10 +347,10 @@ class PongServerLogicConsumer(AsyncConsumer):
     async def game_init(self) -> None:
         """Creates PongGame with default settings."""
         game_settings = PongSettings(
-            FIELD_WIDTH=120,
-            FIELD_DEPTH=170 - 10,
-            PADDLE_WIDTH=18,
-            BALL_SPEEDZ=1.8
+            field_width_=120,
+            field_depth_=170 - 10,
+            paddle_width_=18,
+            ball_speed_=1.8
         )
         self.game = PongGame(game_settings)
         return
